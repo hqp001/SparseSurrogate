@@ -18,7 +18,7 @@ def prune(nn_model, n_size_1d, sparsity):
 
     total_params = count_params(nn_model)
 
-    trainer = ModelTrainer(max_epochs=1, learning_rate=1e-2, device=DEVICE)
+    trainer = ModelTrainer(max_epochs=20, learning_rate=1e-2, device=DEVICE)
 
     print("Accuracy before training: ", trainer.calculate_score(nn_model, test_loader))
     print("Total params: ", total_params)
@@ -41,7 +41,7 @@ def prune(nn_model, n_size_1d, sparsity):
         # print(f"Model accuracy: {accuracy:.3f}%")
         # print(f"New parameters: {n_pruned_parameters}/{total_parameters}")
 
-    trainer = ModelTrainer(max_epochs=1, learning_rate=1e-3, device=DEVICE)
+    trainer = ModelTrainer(max_epochs=50, learning_rate=1e-3, device=DEVICE)
     trainer.train(nn_model, train_loader)
 
     Pruner.apply_mask(nn_model)

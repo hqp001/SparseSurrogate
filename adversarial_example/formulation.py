@@ -6,6 +6,20 @@ from pyscipopt import Model, quicksum
 
 from pyscipopt_ml.add_predictor import add_predictor_constr
 
+def create_neural_network(model_path):
+
+    layers = [nn.Flatten(), nn.Linear(n_pixel_1d**2, layer_size), nn.ReLU()]
+    for i in range(n_layers - 1):
+        layers.append(nn.Linear(layer_size, layer_size))
+        layers.append(nn.ReLU())
+    layers.append(nn.Linear(layer_size, 10))
+    reg = nn.Sequential(*layers)
+
+    reg.load_state_dict(torch.load(model_path, map_location="cpu"))
+    reg.eval()
+
+    return reg
+
 
 def formulate(
     sparsity=0,
@@ -18,19 +32,15 @@ def formulate(
 ):
 
     # Create the neural network
+    dense_path = f"./models/mnist_{n_pixel_1d}_{n_layers}_{layer_size}_{data_seed}_{training_seed}_dense.pth"
+
     if sparsity == 0:
         model_path = f"./models/mnist_{n_pixel_1d}_{n_layers}_{layer_size}_{data_seed}_{training_seed}_dense.pth"
     else:
         model_path = f"./models/mnist_{n_pixel_1d}_{n_layers}_{layer_size}_{data_seed}_{training_seed}_{sparsity}.pth"
-    layers = [nn.Flatten(), nn.Linear(n_pixel_1d**2, layer_size), nn.ReLU()]
-    for i in range(n_layers - 1):
-        layers.append(nn.Linear(layer_size, layer_size))
-        layers.append(nn.ReLU())
-    layers.append(nn.Linear(layer_size, 10))
-    reg = nn.Sequential(*layers)
 
-    reg.load_state_dict(torch.load(model_path))
-    reg.eval()
+    dense_model = create_neural_network(dense_path)
+    sparse_model = create_neural_network(model_path)
 
     data_random_state = np.random.RandomState(data_seed)
     image_number = data_random_state.randint(low=0, high=30000)
@@ -53,7 +63,7 @@ def formulate(
     # values most change the classification of an image
     scip = Model()
 
-    output_values = reg.forward(train_dataset[image_number][0])
+    output_values = sparse_model.forward(train_dataset[image_number][0])
     sorted_labels = torch.argsort(output_values)
     right_label = sorted_labels[0][-1]
     wrong_label = sorted_labels[0][-2]
@@ -100,11 +110,11 @@ def formulate(
     # Add the ML constraint
     pred_cons = add_predictor_constr(
         scip,
-        reg,
+        sparse_model,
         input_vars,
         output_vars,
         unique_naming_prefix="adversarial_",
         formulation=formulation,
     )
 
-    return scip
+    return dense_model, sparse_model, scip
