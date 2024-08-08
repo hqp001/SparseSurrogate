@@ -1,3 +1,4 @@
+import copy
 from train import train
 import numpy as np
 import torch
@@ -31,10 +32,10 @@ def run_training():
             torch.save(model.state_dict(), f"./models/mnist_{n_p}_{n_e}_{d}_{d_s}_{t_s}_dense.pth")
 
             for sparsity in [0.5, 0.8, 0.9]:
-                model_state_dict = torch.load(f"./models/mnist_{n_p}_{n_e}_{d}_{d_s}_{t_s}_dense.pth")
-                model = model.load_state_dict(model_state_dict)
-                model = prune(model, n_p, sparsity)
-                torch.save(model.state_dict(), f"./models/mnist_{n_p}_{n_e}_{d}_{d_s}_{t_s}_{sparsity}.pth")
+                pruning_model = copy.deepcopy(model)
+                pruning_model = pruning_model.to("cpu")
+                pruning_model = prune(pruning_model, n_p, sparsity)
+                torch.save(pruning_model.state_dict(), f"./models/mnist_{n_p}_{n_e}_{d}_{d_s}_{t_s}_{sparsity}.pth")
 
 def get_gurobi_result(gurobi_model):
 
@@ -95,4 +96,4 @@ def run_formulation():
         print("Dense", obj_val, runtime)
         add_line_to_csv("./save.csv", args)
 
-run_formulation()
+run_training()

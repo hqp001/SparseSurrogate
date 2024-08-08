@@ -60,7 +60,7 @@ def train(
     optimizer = optim.Adam(reg.parameters(), weight_decay=0.001)
 
     # Training loop
-    num_epochs = 20
+    num_epochs = 1
 
     for epoch in range(num_epochs):
         reg.train()
@@ -100,6 +100,5 @@ def train(
     print(f"Test Accuracy: {accuracy * 100:.2f}%")
 
     reg = reg.to("cpu")
-
 
     return reg
