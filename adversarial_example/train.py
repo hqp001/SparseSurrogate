@@ -5,6 +5,9 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 import torch.optim as optim
+
+from Trainer.Dataset import MNISTDataset
+
 def train(
     data_seed=42,
     training_seed=42,
@@ -20,30 +23,15 @@ def train(
     image_number = data_random_state.randint(low=0, high=30000)
     torch.manual_seed(training_seed)
 
-    # Define transformations for the MNIST dataset
-    transform = transforms.Compose(
-        [
-            transforms.Resize(n_pixel_1d),  # Resize the image
-            transforms.ToTensor(),  # Convert images to tensors. This automatically normalises to [0,1]
-        ]
-    )
-
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     print("Training with: ", DEVICE)
     # Get MNIST digit recognition data set
-    train_dataset = datasets.MNIST(
-        root="./tests/data/MNIST", train=True, transform=transform, download=True
-    )
-    test_dataset = datasets.MNIST(
-        root="./tests/data/MNIST", train=False, transform=transform, download=True
-    )
-    # Create DataLoader for handling batches
-    batch_size = 64
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_dataloader = MNISTDataset(train=True, n_size_1d = 14, batch_size=64).get_data()
+    test_dataloader = MNISTDataset(train=False, batch_size=64).get_data()
 
     # Create the neural network
     layers = [nn.Flatten(), nn.Linear(n_pixel_1d**2, layer_size), nn.ReLU()]
+
     nn.init.xavier_uniform_(layers[1].weight)
     for i in range(n_layers - 1):
         layers.append(nn.Linear(layer_size, layer_size))

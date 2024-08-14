@@ -6,7 +6,11 @@ from pyscipopt import Model, quicksum
 
 from pyscipopt_ml.add_predictor import add_predictor_constr
 
-def create_neural_network(model_path):
+from Trainer.Dataset import MNISTDataset
+
+MAIN_FOLDER="adversarial_example"
+
+def create_neural_network(model_path, n_layers, n_pixel_1d, layer_size):
 
     layers = [nn.Flatten(), nn.Linear(n_pixel_1d**2, layer_size), nn.ReLU()]
     for i in range(n_layers - 1):
@@ -32,34 +36,23 @@ def formulate(
 ):
 
     # Create the neural network
-    dense_path = f"./models/mnist_{n_pixel_1d}_{n_layers}_{layer_size}_{data_seed}_{training_seed}_dense.pth"
+    dense_path = f"./{MAIN_FOLDER}/models/mnist_{n_pixel_1d}_{n_layers}_{layer_size}_{data_seed}_{training_seed}_dense.pth"
 
     if sparsity == 0:
-        model_path = f"./models/mnist_{n_pixel_1d}_{n_layers}_{layer_size}_{data_seed}_{training_seed}_dense.pth"
+        model_path = f"./{MAIN_FOLDER}/models/mnist_{n_pixel_1d}_{n_layers}_{layer_size}_{data_seed}_{training_seed}_dense.pth"
     else:
-        model_path = f"./models/mnist_{n_pixel_1d}_{n_layers}_{layer_size}_{data_seed}_{training_seed}_{sparsity}.pth"
+        model_path = f"./{MAIN_FOLDER}/models/mnist_{n_pixel_1d}_{n_layers}_{layer_size}_{data_seed}_{training_seed}_{sparsity}.pth"
 
-    dense_model = create_neural_network(dense_path)
-    sparse_model = create_neural_network(model_path)
+    dense_model = create_neural_network(dense_path, n_layers, n_pixel_1d, layer_size)
+    sparse_model = create_neural_network(model_path, n_layers, n_pixel_1d, layer_size)
 
     data_random_state = np.random.RandomState(data_seed)
     image_number = data_random_state.randint(low=0, high=30000)
     torch.manual_seed(training_seed)
 
-    transform = transforms.Compose(
-        [
-            transforms.Resize(n_pixel_1d),  # Resize the image
-            transforms.ToTensor(),  # Convert images to tensors. This automatically normalises to [0,1]
-        ]
-    )
+    train_dataset = MNISTDataset(train=True, n_size_1d=n_pixel_1d).get_raw_data()
+    test_dataset = MNISTDataset(train=True, n_size_1d=n_pixel_1d).get_raw_data()
 
-    # Get MNIST digit recognition data set
-    train_dataset = datasets.MNIST(
-        root="./tests/data/MNIST", train=True, transform=transform, download=True
-    )
-    test_dataset = datasets.MNIST(
-        root="./tests/data/MNIST", train=False, transform=transform, download=True
-    )
     # values most change the classification of an image
     scip = Model()
 
@@ -117,4 +110,4 @@ def formulate(
         formulation=formulation,
     )
 
-    return dense_model, sparse_model, scip
+    return dense_model, sparse_model, right_label, wrong_label, scip

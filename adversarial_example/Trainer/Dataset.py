@@ -12,13 +12,16 @@ class MNISTDataset:
             transforms.ToTensor(),
         ])
 
-        self.data = torchvision.datasets.MNIST(root="./Dataset/MNIST", train=train, download=True, transform=transform)
+        self.data = torchvision.datasets.MNIST(root="./adversarial_example/Dataset/MNIST", train=train, download=True, transform=transform)
 
         self.loader = DataLoader(self.data, batch_size=batch_size, shuffle=False, num_workers=2)
 
 
     def __len__(self):
         return len(self.data)
+
+    def get_raw_data(self):
+        return self.data
 
     def get_data(self):
 

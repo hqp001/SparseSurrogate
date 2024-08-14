@@ -31,12 +31,13 @@ def run_training():
                 build_only=True,
             )
 
-            torch.save(model.state_dict(), f"./models/mnist_{n_p}_{n_e}_{d}_{d_s}_{t_s}_dense.pth")
+            os.makedirs("./adversarial_example/models", exist_ok=True)
+            torch.save(model.state_dict(), f"./adversarial_example/models/mnist_{n_p}_{n_e}_{d}_{d_s}_{t_s}_dense.pth")
 
             for sparsity in [0.5, 0.8, 0.9]:
                 sparse_model = copy.deepcopy(model)
                 sparse_model = prune(sparse_model, n_p, sparsity)
-                torch.save(sparse_model.state_dict(), f"./models/mnist_{n_p}_{n_e}_{d}_{d_s}_{t_s}_{sparsity}.pth")
+                torch.save(sparse_model.state_dict(), f"./adversarial_example/models/mnist_{n_p}_{n_e}_{d}_{d_s}_{t_s}_{sparsity}.pth")
 
 def get_gurobi_result(gurobi_model):
 
@@ -53,9 +54,10 @@ def get_gurobi_result(gurobi_model):
 
     m.optimize()
 
+    sol_dict = {}
     if m.status == 4:
         print(f'Model is infeasible or unbounded')
-        return None, m.Runtime
+        return None, None, m.Runtime
 
     elif m.status == gp.GRB.OPTIMAL or m.SolCount > 0:
         for var in x_vars:
@@ -65,10 +67,15 @@ def get_gurobi_result(gurobi_model):
                 if i not in sol_dict:
                     sol_dict[i] = {}
                 sol_dict[i][j] = var.x
-        return m.ObjVal, m.Runtime
+
+        solution_values = [list(inner_dict.values()) for inner_dict in sol_dict.values()]
+
+        solution_tensor = torch.tensor(solution_values)
+
+        return solution_tensor, m.ObjVal, m.Runtime
 
     elif m.status == gp.GRB.INTERRUPTED or m.status == gp.GRB.TIME_LIMIT:
-        return m.ObjVal, m.Runtime
+        return None, m.ObjVal, m.Runtime
 
     else:
         raise ValueError(f"Unexpected status : {m.status}")
@@ -103,15 +110,26 @@ def argument_generator():
 
 def run_formulation():
     for args in argument_generator():
-        scip = formulate(**args)
+        formulate_results = formulate(**args)
+        scip = formulate_results[-1]
         scip.writeProblem("./a.mps")
-        obj_val, runtime = get_gurobi_result(gp.read("./a.mps"))
+        solution, obj_val, runtime = get_gurobi_result(gp.read("./a.mps"))
 
-        args["Y_max"] = obj_val
+        dense_model, sparse_model = formulate_results[0], formulate_results[1]
+        right_label, wrong_label = formulate_results[2], formulate_results[3]
+
+        with torch.no_grad():
+            print(obj_val)
+            dense_result = dense_model(solution.view(1, -1))
+            sparse_result = sparse_model(solution.view(1, -1))
+
+        args["Y_max_sparse"] = obj_val
+        args["Y_max_dense"] = (dense_result[0][right_label] - dense_result[0][wrong_label] + 1).item()
         args["Runtime"] = runtime
 
+
         print("Dense", obj_val, runtime)
-        add_line_to_csv("./test.csv", args)
+        add_line_to_csv("./adversarial_example/test.csv", args)
 
 def main():
     if len(sys.argv) < 2:
