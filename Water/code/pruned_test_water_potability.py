@@ -3,66 +3,86 @@ from pyscipopt import Model
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.neural_network import MLPClassifier
 from utils import read_csv_to_dict, train_torch_neural_network
+from torch.utils.data import DataLoader, TensorDataset
 import torch
 import torch.nn.utils.prune as prune
 import copy
-
 from src.pyscipopt_ml.add_predictor import add_predictor_constr
+import torch.optim as optim
+import torch.nn as nn
 
-"""
-In this scenario we take the point of view of a health organisation.
-This health organisation has a limited amount of supplies for treating water,
-and they have the goal to treat as much water as possible such that the treated water
-becomes drinkable. Regrettably, they lack resources to explicitly check the potability,
-and must rely on some ML model that decides if the water is safe to drink or not.
+def count_nonzero_parameters(model):
+    non_zero_weights = 0
+    for module in model.modules():
+        if isinstance(module, nn.Linear):
+            non_zero_weights += torch.count_nonzero(module.weight).item()
+    return non_zero_weights
 
-We have access to open source data
-(thanks to: https://github.com/MainakRepositor/Datasets/tree/master and
-https://www.kaggle.com/datasets/uom190346a/water-quality-and-potability),
-for which we can build predictors. The predictor takes as input a variety of features
-about the water, and decides whether or not it is safe to drink.
+def copy_weights_to_new_model(old_model, new_model):
+    with torch.no_grad():
+        for old_layer, new_layer in zip(old_model, new_model):
+            if isinstance(old_layer, nn.Linear) and isinstance(new_layer, nn.Linear):
+                new_layer.weight.data = old_layer.weight.data.clone()
+                new_layer.bias.data = old_layer.bias.data.clone()
 
-The goal of this MIP is to treat the samples of water s.t. the largest amount
-of water becomes drinkable. There are some constraints on which features can be treated,
-due to to available resources.
-
-Let I be the index set of the water samples
-Let J be the index set of the features of the water
-Let x[i][j] be the variable that takes the value for sample i and feature j after treatment
-Let water_sample[i][j] be the value for sample i and feature j before treatment
-Let f be the ML predictor that decides if x[i][:] is drinkable or not
-
-The MIP formulation is:
-
-x[i][j] = water_sample[i][j] - removed[i][j] + added[i][j] for all i, j
-sum_i removed[i][j] <= remove_budget[j] for all j
-sum_i added[i][j] <= added_budget[j] for all j
-y[i] = f(x[i][:])
-
-max(sum_i y[i])
-"""
-
-def lottery_ticket_prune_and_fine_tune(model, X_train, y_train, n_rounds, total_sparsity, n_epochs=10, lr=0.01):
+def prune_and_fine_tune_lottery_ticket(model, X_train, y_train, initial_state_dict, n_rounds, total_sparsity, n_epochs=10, lr=0.01):
     prune_pc_per_round = 1 - (1 - total_sparsity) ** (1 / n_rounds)
-    
-    print(f"Initial non-zero weights: {model.count_nonzero_weights()}")
-    
+
+    # Determine the correct loss function based on the model output
+    if model[-1].__class__.__name__ == 'Sigmoid':
+        criterion = nn.BCELoss()
+        y_train = y_train.float().view(-1, 1)  # Ensure targets are the correct shape and type for BCELoss
+    else:
+        criterion = nn.CrossEntropyLoss()
+
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), weight_decay=0.001)
+
     for round in range(n_rounds):
-        print(f"\nPruning round {round + 1} of {n_rounds}")
+
+        dataloader = DataLoader(
+            TensorDataset(torch.Tensor(X_train), y_train),
+            batch_size=64,
+            shuffle=True,
+        )
+        for epoch in range(n_epochs):
+            for batch_X, batch_y in dataloader:
+                model.train()
+                optimizer.zero_grad()
+                outputs = model(batch_X)
+                loss = criterion(outputs, batch_y)
+                loss.backward()
+                optimizer.step()
+
+        # Print the number of non-zero parameters after fine-tuning
+        non_zero_params = count_nonzero_parameters(model)
+        print(f"After fine-tuning round {round + 1}, non-zero parameters: {non_zero_params}")
         
-        # Train the model
-        model.fine_tune(X_train, y_train, n_epochs=n_epochs, lr=lr)
-        print(f"After fine-tuning, non-zero weights: {model.count_nonzero_weights()}")
-        
-        # Prune the model
-        model.prune(prune_pc_per_round)
-        print(f"After pruning, non-zero weights: {model.count_nonzero_weights()}")
-        
+        # Prune the model while preserving zeros
+        parameters_to_prune = [(module, 'weight') for module in model if isinstance(module, nn.Linear)]
+        prune.global_unstructured(parameters_to_prune, pruning_method=prune.L1Unstructured, amount=prune_pc_per_round)
+
+        # Print the number of non-zero parameters after pruning
+        non_zero_params = count_nonzero_parameters(model)
+        print(f"After pruning round {round + 1}, non-zero parameters: {non_zero_params}")
+
     # Final fine-tuning after all pruning rounds
-    model.fine_tune(X_train, y_train, n_epochs=n_epochs, lr=lr)
-    print(f"Final non-zero weights: {model.count_nonzero_weights()}")
-    
+    for epoch in range(n_epochs):
+        for batch_X, batch_y in dataloader:
+            model.train()
+            optimizer.zero_grad()
+            outputs = model(batch_X)
+            loss = criterion(outputs, batch_y)
+            loss.backward()
+            optimizer.step()
+
+    # Final count of non-zero parameters
+    non_zero_params = count_nonzero_parameters(model)
+    print(f"Final non-zero parameters: {non_zero_params}")
+
     return model
+
+
+
 
 def build_and_optimise_water_potability(
     data_seed=42,
@@ -106,7 +126,7 @@ def build_and_optimise_water_potability(
     )
 
     # Path to water potability data
-    data_dict = read_csv_to_dict("./tests/data/water_quality.csv")
+    data_dict = read_csv_to_dict("./data/water_quality.csv")
 
     # The features of our predictor. All distance based features are variables.
     features = [
@@ -160,15 +180,29 @@ def build_and_optimise_water_potability(
             )
 
             # Prune and fine-tune the PyTorch model
-            clf = lottery_ticket_prune_and_fine_tune(
+            initial_state_dict = copy.deepcopy(clf.state_dict())
+            clf = prune_and_fine_tune_lottery_ticket(
                 clf, 
-                X_train=X, 
-                y_train=y, 
+                X_train=torch.tensor(X, dtype=torch.float32), 
+                y_train=torch.tensor(y, dtype=torch.long), 
+                initial_state_dict=initial_state_dict, 
                 n_rounds=n_pruning_rounds, 
                 total_sparsity=total_sparsity, 
                 n_epochs=10, 
                 lr=0.01
             )
+            new_clf = train_torch_neural_network(
+                X,
+                y,
+                n_estimators_layers,
+                layer_size,
+                training_seed,
+                reshape=True,
+                binary_classifier=True,
+            )
+            copy_weights_to_new_model(clf, new_clf)
+            clf = new_clf
+            
 
         else:
             raise ValueError(f"Unknown framework: {framework}")

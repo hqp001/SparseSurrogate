@@ -4,7 +4,7 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.neural_network import MLPClassifier
 from tensorflow import keras
 from utils import read_csv_to_dict, train_torch_neural_network
-
+from torch.utils.data import DataLoader, TensorDataset
 from src.pyscipopt_ml.add_predictor import add_predictor_constr
 
 """
@@ -50,7 +50,7 @@ def build_and_optimise_water_potability(
     layer_size=16,
     max_depth=5,
     n_estimators_layers=3,
-    framework="sklearn",
+    framework="torch",
     build_only=False,
 ):
     assert predictor_type in ("mlp", "gbdt")
@@ -81,7 +81,7 @@ def build_and_optimise_water_potability(
     )
 
     # Path to water potability data
-    data_dict = read_csv_to_dict("./tests/data/water_quality.csv")
+    data_dict = read_csv_to_dict("./data/water_quality.csv")
 
     # The features of our predictor. All distance based features are variables.
     features = [
