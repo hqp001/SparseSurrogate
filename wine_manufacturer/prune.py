@@ -1,7 +1,7 @@
 from Trainer.Trainer import ModelTrainer
 from Trainer.Pruner import Pruner
 from Trainer.Dataset import MNISTDataset
-from ModelHelpers import init_weights, count_params
+from Trainer.ModelHelpers import init_weights, count_params
 from copy import deepcopy
 import torch
 

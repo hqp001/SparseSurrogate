@@ -1,4 +1,5 @@
 import os
+import csv
 import numpy as np
 from pyscipopt import Model, quicksum
 from utils import read_csv_to_dict, train_torch_neural_network
@@ -6,6 +7,8 @@ from utils import read_csv_to_dict, train_torch_neural_network
 from pyscipopt_ml.add_predictor import add_predictor_constr
 
 from prune import prune
+
+import gurobipy as gp
 
 def build_and_optimise_wine_manufacturer(
     data_seed=42,
@@ -149,7 +152,11 @@ def build_and_optimise_wine_manufacturer(
         quicksum(-quality_vars[i][0] for i in range(n_wines_to_produce)) / n_wines_to_produce + 10
     )
 
-    return scip
+    scip.writeProblem(
+        f"./wine_manufacturer/formulation/wine_formulation.mps"
+    )
+
+    return gp.read(f"./wine_manufacturer/formulation/wine_formulation.mps")
 
 def test_wine_manufacturer_sklearn_mlp_bigm():
     scip = build_and_optimise_wine_manufacturer(
@@ -163,28 +170,63 @@ def test_wine_manufacturer_sklearn_mlp_bigm():
         layer_size=7,
     )
 
+def get_gurobi_result(gurobi_model):
 
-for d_s in [0, 1]:
-    for t_s in [0, 1]:
+    m = gurobi_model
+
+    m.setParam("TimeLimit", 300)
+
+    m.optimize()
+
+    if m.status == 4 or m.status == 3:
+        print(f'Model is infeasible or unbounded')
+        return None, m.Runtime
+
+    elif m.status == gp.GRB.OPTIMAL or m.SolCount > 0:
+
+        return m.ObjVal, m.Runtime
+
+    elif m.status == gp.GRB.INTERRUPTED or m.status == gp.GRB.TIME_LIMIT:
+        return m.ObjVal, m.Runtime
+
+    else:
+        raise ValueError(f"Unexpected status : {m.status}")
+
+def add_line_to_csv(file_name, data):
+    file_exists = os.path.isfile(file_name)
+
+    with open(file_name, 'a', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+
+        if not file_exists:
+            writer.writerow(data.keys())
+
+        writer.writerow(data.values())
+
+def argument_generators():
+
+    for d_s, t_s in [(0, 0), (1, 3), (5, 8)]:
         wine_data = []
         for n_v in [30, 35]:
             for n_w in [4, 5]:
-                # Generate the neural network instances
-                for formulation in ["bigm", "sos"]:
-                    for n_e, d in [(2, 16), (2, 32), (3, 16)]:
-                        for sparsity in [0, 0.5, 0.8, 0.9]:
-                            scip = build_and_optimise_wine_manufacturer(
-                                data_seed=d_s,
-                                training_seed=t_s,
-                                n_vineyards=n_v,
-                                n_wines_to_produce=n_w,
-                                formulation=formulation,
-                                n_estimators_layers=n_e,
-                                layer_size=d,
-                                epsilon=0.0001,
-                                sparsity=sparsity
-                            )
-                            os.makedirs("./wine_manufacturer/formulation", exist_ok=True)
-                            scip.writeProblem(
-                                f"./wine_manufacturer/formulation/wine_{n_v}_{n_w}_mlp-{formulation}_{n_e}_{d}_torch_{d_s}_{t_s}_{sparsity}.mps"
-                            )
+                for n_e, d in [(2, 16), (2, 32), (3, 16)]:
+                    for sparsity in [0, 0.5, 0.8, 0.9]:
+                        yield {
+                            "data_seed": d_s,
+                            "training_seed": t_s,
+                            "n_vineyards": n_v,
+                            "n_wines_to_produce": n_w,
+                            "n_estimators_layers": n_e,
+                            "layer_size": d,
+                            "epsilon": 0.0001,
+                            "sparsity": sparsity
+                        }
+
+os.makedirs("./wine_manufacturer/formulation", exist_ok=True)
+for args in argument_generators():
+    gurobi_model = build_and_optimise_wine_manufacturer(**args)
+    result, runtime = get_gurobi_result(gurobi_model)
+    args["Result"] = result
+    args["Runtime"] = runtime
+
+    add_line_to_csv("./wine_manufacturer/result.csv", args)
