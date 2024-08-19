@@ -54,7 +54,7 @@ def get_gurobi_result(gurobi_model):
     m.optimize()
 
     sol_dict = {}
-    if m.status == 4:
+    if m.status == 4 or m.status == 3:
         print(f'Model is infeasible or unbounded')
         return None, None, m.Runtime
 
