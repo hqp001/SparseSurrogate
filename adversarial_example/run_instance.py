@@ -18,7 +18,7 @@ def run_training():
     adversarial_data = []
 
     for d_s, t_s in [(0, 0), (1, 3), (8, 12), (90, 99)]:
-        for n_p in [14, 16, 18]:
+        for n_p in [16]:
             for n_e, d in [(3, 16), (3, 32), (4, 16), (4, 32)]:
                 model = train(
                     data_seed=d_s,

@@ -26,8 +26,8 @@ def train(
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     print("Training with: ", DEVICE)
     # Get MNIST digit recognition data set
-    train_dataloader = MNISTDataset(train=True, n_size_1d = 14, batch_size=64).get_data()
-    test_dataloader = MNISTDataset(train=False, batch_size=64).get_data()
+    train_dataloader = MNISTDataset(train=True, n_size_1d = n_pixel_1d, batch_size=64).get_data()
+    test_dataloader = MNISTDataset(train=False, n_size_1d = n_pixel_1d, batch_size=64).get_data()
 
     # Create the neural network
     layers = [nn.Flatten(), nn.Linear(n_pixel_1d**2, layer_size), nn.ReLU()]
@@ -79,6 +79,7 @@ def train(
         for batch_X, batch_y in test_dataloader:
             x = batch_X.to(DEVICE)
             y = batch_y.to(DEVICE)
+
             outputs = reg(x)
             _, predicted = torch.max(outputs, 1)
             total += y.size(0)

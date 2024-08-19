@@ -11,8 +11,8 @@ def prune(nn_model, n_size_1d, sparsity):
 
     print("Device to train: ", DEVICE)
 
-    train_loader = MNISTDataset(train=True, n_size_1d = 14, batch_size=64).get_data()
-    test_loader = MNISTDataset(train=False, batch_size=64).get_data()
+    train_loader = MNISTDataset(train=True, n_size_1d = n_size_1d, batch_size=64).get_data()
+    test_loader = MNISTDataset(train=False, n_size_1d = n_size_1d, batch_size=64).get_data()
 
     nn_model = nn_model.to(device=DEVICE)
 

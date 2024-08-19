@@ -2,44 +2,15 @@ import torch
 import tqdm
 import onnx2torch
 
-class GetReshapeInit(torch.fx.Interpreter):
-    def call_module(self, target, args, kwargs):
-        print(type(target), target)
-        print(type(args), args)
-        print(type(kwargs), kwargs)
-
-        return super().call_module(n)
-
 class ModelTrainer:
     def __init__(self, max_epochs, learning_rate, device):
         self.max_epochs = max_epochs
         self.learning_rate = learning_rate
         self.device = device
 
-    def before_train_do(self, model):
-
-        self.remove_handle = []
-
-        def pre_hook(module, args):
-            modified_shape = torch.tensor([args[0].size(0), -1])
-            return (args[0], modified_shape)
-
-        # This is to fix batch size in sri_resnet_a
-        for name, module in model.named_modules():
-            if isinstance(module, onnx2torch.node_converters.reshape.OnnxReshape):
-                self.remove_handle.append(module.register_forward_pre_hook(pre_hook))
-
-    def after_train_do(self, model):
-
-        for handle in self.remove_handle:
-            handle.remove()
-
     def train(self, model, data_loader, l1_reg=0, l2_reg=0):
 
-        #optimiser = torch.optim.Adam(params=model.parameters(), weight_decay=1e-4, lr=1e-3)
         optimiser = torch.optim.SGD(params=model.parameters(), lr=self.learning_rate)
-
-        self.before_train_do(model)
 
         for epoch in range(self.max_epochs):
 
@@ -82,8 +53,6 @@ class ModelTrainer:
                 loss.backward()
                 optimiser.step()
 
-        self.after_train_do(model)
-
         return (num_correct / num_samples).item()
 
     def calculate_score(self, model, data_loader):
@@ -92,8 +61,6 @@ class ModelTrainer:
         num_samples = 0
 
         model.eval()
-
-        self.before_train_do(model)
 
         with torch.no_grad():
             for x, y in data_loader:
@@ -108,7 +75,6 @@ class ModelTrainer:
 
             acc = float(num_correct) / num_samples
 
-        self.after_train_do(model)
 
         return acc
 
