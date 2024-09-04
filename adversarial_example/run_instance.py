@@ -19,7 +19,7 @@ def run_training():
 
     for d_s, t_s in [(0, 0), (1, 3), (8, 12), (90, 99)]:
         for n_p in [28, 22, 18]:
-            for n_e, d in [(4, 32), (4, 64), (4, 128), (5, 32), (5, 64), (5, 128)]:
+            for n_e, d in [(4, 256), (4, 512), (5, 256), (5, 512)]:
                 model = train(
                     data_seed=d_s,
                     training_seed=t_s,
@@ -38,27 +38,72 @@ def run_training():
                     sparse_model = prune(sparse_model, n_p, sparsity)
                     torch.save(sparse_model.state_dict(), f"./adversarial_example/models/mnist_{n_p}_{n_e}_{d}_{d_s}_{t_s}_{sparsity}.pth")
 
-def get_gurobi_result(gurobi_model):
+def remove_current_solution(model):
+    # Retrieve integer variables
+    int_vars = [v for v in model.getVars() if v.vType in [gp.GRB.BINARY]]
+
+    # Get the current solution values for these variables
+    current_solution = [v.x for v in int_vars]
+
+    # Create a new constraint to remove this solution
+    expr = 0
+    for i, var in enumerate(int_vars):
+        if current_solution[i] <= 0.5:
+            expr += int_vars
+        else:
+            expr += 1 - int_vars
+
+    model.addConstr(expr >= 1, name="exclude_solution")
+
+    return model
+
+
+best_sol = None
+
+def compare_sol(solution_tensor, dense_model, right_label, wrong_label):
+
+    global best_sol
+
+    with torch.no_grad():
+        dense_result = dense_model(solution_tensor.view(1, -1))
+        dense_result = (dense_result[0][right_label] - dense_result[0][wrong_label] + 1).item()
+
+
+    if best_sol == None:
+        best_sol = (dense_result, solution_tensor)
+
+    elif dense_result < best_sol[0]:
+        best_sol = (dense_result, solution_tensor)
+
+
+def get_gurobi_result(time_limit, gurobi_model, dense_model, right_label, wrong_label):
+
+    if time_limit <= 0:
+        return None, None, None
 
     m = gurobi_model
 
-    m.setParam("TimeLimit", 300)
+    m.reset()
+
+    m.setParam("TimeLimit", time_limit)
 
     x_vars = []
 
     # Iterate through all variables in the Gurobi model
-    for var in gurobi_model.getVars():
+    for var in m.getVars():
         if var.varName.startswith('x_'):
             x_vars.append(var)
 
     m.optimize()
 
     sol_dict = {}
+
     if m.status == 4 or m.status == 3:
         print(f'Model is infeasible or unbounded')
         return None, None, m.Runtime
 
     elif m.status == gp.GRB.OPTIMAL or m.SolCount > 0:
+
         for var in x_vars:
             match = re.match(r'x_(\d+)_(\d+)', var.varName)
             if match:
@@ -71,7 +116,14 @@ def get_gurobi_result(gurobi_model):
 
         solution_tensor = torch.tensor(solution_values)
 
-        return solution_tensor, m.ObjVal, m.Runtime
+        compare_sol(solution_tensor, dense_model, right_label, wrong_label)
+
+        time_limit -= m.Runtime
+
+        remove_current_solution(m)
+        get_gurobi_result(time_limit, m, dense_model, right_label, wrong_label)
+
+        return None, None, None
 
     elif m.status == gp.GRB.INTERRUPTED or m.status == gp.GRB.TIME_LIMIT:
         return None, m.ObjVal, m.Runtime
@@ -94,41 +146,40 @@ def add_line_to_csv(file_name, data):
 
 def argument_generator():
     for d_s, t_s in [(0, 0), (1, 3), (8, 12), (90, 99)]:
-        for n_p in [14, 16, 18]:
-            for n_e, d in [(3, 16), (3, 32), (4, 16), (4, 32)]:
-                for formulation in ["sos", "bigm"]:
-                    for sparsity in [0, 0.5, 0.8, 0.9]:
-                        yield {
-                            'data_seed': 0,
-                            'training_seed': 0,
-                            'n_pixel_1d': n_p,
-                            'formulation': formulation,
-                            'n_layers': n_e,
-                            'layer_size': d,
-                            'sparsity': sparsity
-                        }
+        for n_p in [28, 22, 18]:
+            for n_e, d in [(4, 32), (4, 64), (4, 128), (5, 32), (5, 64), (5, 128)]:
+                for sparsity in [0, 0.5, 0.8, 0.9]:
+                    yield {
+                        'data_seed': 0,
+                        'training_seed': 0,
+                        'n_pixel_1d': n_p,
+                        'n_layers': n_e,
+                        'layer_size': d,
+                        'sparsity': sparsity
+                    }
 
 def run_formulation():
+    global best_sol
     for args in argument_generator():
+        best_sol = None
         formulate_results = formulate(**args)
         scip = formulate_results[-1]
         scip.writeProblem("./a.mps")
-        solution, obj_val, runtime = get_gurobi_result(gp.read("./a.mps"))
 
         dense_model, sparse_model = formulate_results[0], formulate_results[1]
         right_label, wrong_label = formulate_results[2], formulate_results[3]
 
-        with torch.no_grad():
-            print(obj_val)
-            dense_result = dense_model(solution.view(1, -1))
-            sparse_result = sparse_model(solution.view(1, -1))
+        solution, obj_val, runtime = get_gurobi_result(500, gp.read("./a.mps"), dense_model, right_label, wrong_label)
 
-        args["Y_max_sparse"] = obj_val
-        args["Y_max_dense"] = (dense_result[0][right_label] - dense_result[0][wrong_label] + 1).item()
+        if best_sol != None:
+            args["Y_min"] = best_sol[0]
+
+        else:
+            args["Y_min"] = None
+
         args["Runtime"] = runtime
 
 
-        print("Dense", obj_val, runtime)
         add_line_to_csv("./adversarial_example/test.csv", args)
 
 def main():
