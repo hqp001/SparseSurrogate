@@ -5,7 +5,7 @@ from ModelHelpers import init_weights, count_params
 from copy import deepcopy
 import torch
 
-ROUNDS = 10
+ROUNDS = 2 #10
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 def prune(nn_model, n_size_1d, sparsity):
 
@@ -18,7 +18,8 @@ def prune(nn_model, n_size_1d, sparsity):
 
     total_params = count_params(nn_model)
 
-    trainer = ModelTrainer(max_epochs=20, learning_rate=1e-2, device=DEVICE)
+    # max_epochs = 20
+    trainer = ModelTrainer(max_epochs=5, learning_rate=1e-2, device=DEVICE)
 
     print("Accuracy before training: ", trainer.calculate_score(nn_model, test_loader))
     print("Total params: ", total_params)
@@ -33,15 +34,15 @@ def prune(nn_model, n_size_1d, sparsity):
         # Fit the model to the training data
         trainer.train(nn_model, train_loader)
 
-        pruned_model = Pruner(sparsity=prune_pc_per_round).prune(nn_model)
+        pruned_model = Pruner(sparsity=prune_pc_per_round, structured=True).prune(nn_model)
 
         # Reset model
         init_weights(nn_model, initial_weights)
 
         # print(f"Model accuracy: {accuracy:.3f}%")
         # print(f"New parameters: {n_pruned_parameters}/{total_parameters}")
-
-    trainer = ModelTrainer(max_epochs=20, learning_rate=1e-3, device=DEVICE)
+    # max_epochs = 20
+    trainer = ModelTrainer(max_epochs=5, learning_rate=1e-3, device=DEVICE)
     trainer.train(nn_model, train_loader)
 
     Pruner.apply_mask(nn_model)
