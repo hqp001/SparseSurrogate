@@ -48,7 +48,7 @@ def train(
     optimizer = optim.Adam(reg.parameters(), weight_decay=0.001)
 
     # Training loop
-    num_epochs = 1
+    num_epochs = 20
 
     for epoch in range(num_epochs):
         reg.train()
