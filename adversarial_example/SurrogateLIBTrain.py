@@ -8,15 +8,15 @@ import torch.optim as optim
 
 from Trainer.Dataset import MNISTDataset
 
+TRAIN_EPOCHS = 5
+
 def train(
-    data_seed=42,
-    training_seed=42,
-    n_pixel_1d=16,
-    layer_size=16,
-    n_layers=2,
-    test=True,
-    formulation="sos",
-    build_only=False,
+    data_seed,
+    training_seed,
+    n_pixel_1d,
+    layer_size,
+    n_layers,
+    training_epochs,
 ):
     # Set random seed for reproducibility and select the image that is going to be perturbed
     data_random_state = np.random.RandomState(data_seed)
@@ -47,10 +47,7 @@ def train(
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(reg.parameters(), weight_decay=0.001)
 
-    # Training loop
-    num_epochs = 20
-
-    for epoch in range(num_epochs):
+    for epoch in range(training_epochs):
         reg.train()
         for batch_X, batch_y in train_dataloader:
             # Forward pass
@@ -67,7 +64,7 @@ def train(
             optimizer.step()
 
         # Print training loss after each epoch
-        print(f"Epoch [{epoch + 1}/{num_epochs}], Training Loss: {loss.item():.4f}")
+        print(f"Epoch [{epoch + 1}/{training_epochs}], Training Loss: {loss.item():.4f}")
 
     # Test the trained model on the test dataset
     reg.eval()
@@ -90,4 +87,4 @@ def train(
 
     reg = reg.to("cpu")
 
-    return reg
+    return reg, accuracy

@@ -8,8 +8,6 @@ from pyscipopt_ml.add_predictor import add_predictor_constr
 
 from Trainer.Dataset import MNISTDataset
 
-MAIN_FOLDER="adversarial_example"
-
 def create_neural_network(model_path, n_layers, n_pixel_1d, layer_size):
 
     layers = [nn.Flatten(), nn.Linear(n_pixel_1d**2, layer_size), nn.ReLU()]
@@ -26,25 +24,19 @@ def create_neural_network(model_path, n_layers, n_pixel_1d, layer_size):
 
 
 def formulate(
-    sparsity=0,
-    data_seed=42,
-    training_seed=42,
-    n_pixel_1d=16,
-    layer_size=16,
-    n_layers=2,
-    formulation="sos",
+    data_seed,
+    training_seed,
+    n_pixel_1d,
+    layer_size,
+    n_layers,
+
+    model_path,
+    surrogate_path,
+    formulation="sos"
 ):
 
-    # Create the neural network
-    dense_path = f"./{MAIN_FOLDER}/models/mnist_{n_pixel_1d}_{n_layers}_{layer_size}_{data_seed}_{training_seed}_dense.pth"
-
-    if sparsity == 0:
-        model_path = f"./{MAIN_FOLDER}/models/mnist_{n_pixel_1d}_{n_layers}_{layer_size}_{data_seed}_{training_seed}_dense.pth"
-    else:
-        model_path = f"./{MAIN_FOLDER}/models/mnist_{n_pixel_1d}_{n_layers}_{layer_size}_{data_seed}_{training_seed}_{sparsity}.pth"
-
-    dense_model = create_neural_network(dense_path, n_layers, n_pixel_1d, layer_size)
-    sparse_model = create_neural_network(model_path, n_layers, n_pixel_1d, layer_size)
+    dense_model = create_neural_network(model_path, n_layers, n_pixel_1d, layer_size)
+    sparse_model = create_neural_network(surrogate_path, n_layers, n_pixel_1d, layer_size)
 
     data_random_state = np.random.RandomState(data_seed)
     image_number = data_random_state.randint(low=0, high=30000)
