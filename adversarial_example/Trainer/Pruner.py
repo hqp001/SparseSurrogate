@@ -6,7 +6,7 @@ import tqdm
 
 class Pruner:
 
-    def __init__(self, sparsity = 0, structured=True):
+    def __init__(self, sparsity, structured):
 
         self.sparsity = sparsity
         self.structured = structured
