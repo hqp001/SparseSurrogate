@@ -37,7 +37,7 @@ def prune(nn_model, n_size_1d, sparsity, n_rounds, max_epochs):
         # Fit the model to the training data
         trainer.train(nn_model, train_loader)
 
-        pruned_model = Pruner(sparsity=prune_pc_per_round, structured=False).prune(nn_model)
+        pruned_model = Pruner(sparsity=prune_pc_per_round, structured=True).prune(nn_model)
 
         # Reset model
         init_weights(nn_model, initial_weights)

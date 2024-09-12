@@ -172,3 +172,4 @@ adversarial_example/models
 a.mps
 log/
 temp/
+adversarial_example/*.mps
