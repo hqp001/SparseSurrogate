@@ -51,7 +51,8 @@ def run_training():
                 'test_score': test_score,
                 'sparsity': sparsity,
                 'n_rounds': ROUNDS,
-                'prune_epochs': PRUNE_EPOCHS
+                'prune_epochs': PRUNE_EPOCHS,
+                'structured': True
             }
             manager.insert_model(input_id=input_id, model_name=f'sparse_{sparsity}', output_args=output_args, model=sparse_model)
             #torch.save(sparse_model.state_dict(), f"./adversarial_example/models/{model_id}/sparse_{sparsity}.pth")

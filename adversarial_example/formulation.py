@@ -32,7 +32,7 @@ def formulate(
 
     model_path,
     surrogate_path,
-    formulation="sos"
+    formulation="bigm"
 ):
 
     dense_model = create_neural_network(model_path, n_layers, n_pixel_1d, layer_size)
