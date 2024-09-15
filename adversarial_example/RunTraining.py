@@ -33,7 +33,12 @@ def run_training():
 
         model, accuracy = SurrogateLIBTrain(**args)
 
-        input_id = manager.insert_input_arguments(input_args=args)
+        input_id = manager.generate_id_from_args(args)
+
+        model_path, output = manager.get_model_info(input_id=input_id, model_name="dense")
+        model.load_state_dict(torch.load(model_path))
+
+        #input_id = manager.insert_input_arguments(input_args=args)
 
         output_args = {
             'accuracy': accuracy,
@@ -41,9 +46,9 @@ def run_training():
         }
 
         #torch.save(model.state_dict(), f"./adversarial_example/models/{model_id}/dense.pth")
-        manager.insert_model(input_id=input_id, model_name='dense', output_args=output_args, model=model)
+        #manager.insert_model(input_id=input_id, model_name='dense', output_args=output_args, model=model)
 
-        for sparsity in [0.5, 0.8, 0.9]:
+        for sparsity in [0.2, 0.3]:
             sparse_model = copy.deepcopy(model)
             sparse_model, test_score = prune(sparse_model, args['n_pixel_1d'], sparsity, n_rounds=ROUNDS, max_epochs=PRUNE_EPOCHS)
             output_args = {
@@ -52,9 +57,10 @@ def run_training():
                 'sparsity': sparsity,
                 'n_rounds': ROUNDS,
                 'prune_epochs': PRUNE_EPOCHS,
+                'prune_function': 'ln_structured',
                 'structured': True
             }
-            manager.insert_model(input_id=input_id, model_name=f'sparse_{sparsity}', output_args=output_args, model=sparse_model)
+            manager.insert_model(input_id=input_id, model_name=f'structure_{sparsity}', output_args=output_args, model=sparse_model)
             #torch.save(sparse_model.state_dict(), f"./adversarial_example/models/{model_id}/sparse_{sparsity}.pth")
 
 def main():
