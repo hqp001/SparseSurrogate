@@ -1,3 +1,4 @@
+import sys
 import os
 import torch
 import gurobipy as gp
@@ -6,6 +7,15 @@ from formulation import formulate
 import manager
 
 TIME_LIMIT = 300
+MAP_BATCH = {
+    -1: -1,
+    0: 0,
+    1: 1,
+    2: 8,
+    3: 90
+}
+BATCH_NUM = -1
+
 
 def gurobi_callback(model, where):
     #global first_negative_time, most_negative_solution, start_time
@@ -214,6 +224,10 @@ def run_formulation():
         formulate_args = manager.filter_arguments(input_args, args_list)
         formulate_args["model_path"] = f"./models/{input_id}/dense/dense.pth"
 
+        if input_args['data_seed'] != MAP_BATCH[BATCH_NUM]:
+            continue
+
+
         for model_name in manager.get_all_model_names(input_id=input_id):
 
             print(f"\nSolving {input_id} - {model_name}")
@@ -224,11 +238,11 @@ def run_formulation():
             formulate_results = formulate(**formulate_args)
 
             scip = formulate_results[-1]
-            scip.writeProblem("./tmp.mps")
+            scip.writeProblem(f"./{BATCH_NUM}.mps")
             dense_model, sparse_model = formulate_results[0], formulate_results[1]
             right_label, wrong_label = formulate_results[2], formulate_results[3]
 
-            objective_value, most_negative_solution, first_negative_time, runtime, solver_status = get_gurobi_result(TIME_LIMIT, gp.read("./tmp.mps"), dense_model, right_label, wrong_label)
+            objective_value, most_negative_solution, first_negative_time, runtime, solver_status = get_gurobi_result(TIME_LIMIT, gp.read(f"./{BATCH_NUM}.mps"), dense_model, right_label, wrong_label)
 
             gurobi_args = {}
             gurobi_args["ObjectiveValue"] = objective_value
@@ -236,6 +250,7 @@ def run_formulation():
             gurobi_args["TimeFirstNegative"] = first_negative_time
             gurobi_args["SolverStatus"] = solver_status
             gurobi_args["Runtime"] = runtime
+            gurobi_args["BatchNum"] = BATCH_NUM
 
             model_info["SubSolver"] = gurobi_args
 
@@ -245,7 +260,14 @@ def run_formulation():
 
 
 def main():
+    if len(sys.argv) != 2:
+        print("Usage: python RunSolver.py BATCH_NUM")
+        sys.exit(1)
+
+    global BATCH_NUM
+    BATCH_NUM = int(sys.argv[1])
     run_formulation()
+
 
 if __name__ == "__main__":
     main()
