@@ -167,8 +167,11 @@ cython_debug/
 */log/
 adversarial_example/test.csv
 adversarial_example/adversarial_example
+adversarial_example/experiments
+adversarial_example/*.zip
 tests/
 adversarial_example/models
+adversarial_example/fashion_experiments
 a.mps
 log/
 temp/
