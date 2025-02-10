@@ -169,6 +169,7 @@ adversarial_example/test.csv
 adversarial_example/adversarial_example
 tests/
 adversarial_example/models
+adversarial_example/fashion_experiments
 a.mps
 log/
 temp/
