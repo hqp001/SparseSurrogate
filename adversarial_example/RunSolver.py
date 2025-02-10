@@ -9,12 +9,14 @@ import manager
 TIME_LIMIT = 300
 MAP_BATCH = {
     -1: -1,
-    0: 0,
-    1: 1,
-    2: 8,
-    3: 90
+    0: [0, 10],
+    1: [20, 30],
+    2: [40, 50],
+    3: [60, 70],
+    4: [80, 90]
 }
 BATCH_NUM = -1
+BASE_FOLDER = "fashion_experiments"
 
 def gurobi_callback(model, where):
     #global first_negative_time, most_negative_solution, start_time
@@ -99,7 +101,7 @@ def get_gurobi_result(time_limit, gurobi_model, dense_model, right_label, wrong_
     m = gurobi_model
 
     m.setParam("TimeLimit", time_limit)
-    m.setParam("Threads", 8)
+    #m.setParam("Threads", 8)
     #m.setParam("LazyConstraints", 1)
 
     m._dense_model = dense_model
@@ -148,13 +150,16 @@ def run_formulation():
         args_list = ['data_seed', 'training_seed', 'n_pixel_1d',
                 'n_layers', 'layer_size']
 
-        if input_args['data_seed'] != MAP_BATCH[BATCH_NUM]:
+        if input_args['data_seed'] not in MAP_BATCH[BATCH_NUM]:
             continue
 
         formulate_args = manager.filter_arguments(input_args, args_list)
-        formulate_args["model_path"] = f"./models/{input_id}/dense/dense.pth"
+        formulate_args["model_path"] = f"./{BASE_FOLDER}/{input_id}/dense/dense.pth"
 
         for model_name in manager.get_all_model_names(input_id=input_id):
+
+            if "nonfinetune" not in model_name:
+                continue
 
             print(f"\nSolving {input_id} - {model_name}")
 

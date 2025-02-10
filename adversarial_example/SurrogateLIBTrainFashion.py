@@ -1,9 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
 import torch.optim as optim
 
 from Trainer.Dataset import FashionMNISTDataset
@@ -19,15 +17,13 @@ def train(
     training_epochs,
 ):
     # Set random seed for reproducibility and select the image that is going to be perturbed
-    data_random_state = np.random.RandomState(data_seed)
-    image_number = data_random_state.randint(low=0, high=30000)
     torch.manual_seed(training_seed)
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     print("Training with: ", DEVICE)
     # Get MNIST digit recognition data set
-    train_dataloader = MNISTDataset(train=True, n_size_1d = n_pixel_1d, batch_size=64).get_data()
-    test_dataloader = MNISTDataset(train=False, n_size_1d = n_pixel_1d, batch_size=64).get_data()
+    train_dataloader = FashionMNISTDataset(train=True, n_size_1d = n_pixel_1d, batch_size=32).get_data()
+    test_dataloader = FashionMNISTDataset(train=False, n_size_1d = n_pixel_1d, batch_size=64).get_data()
 
     # Create the neural network
     layers = [nn.Flatten(), nn.Linear(n_pixel_1d**2, layer_size), nn.ReLU()]
@@ -45,7 +41,9 @@ def train(
 
     reg = reg.to(DEVICE)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(reg.parameters(), weight_decay=0.0001)
+    optimizer = optim.Adam(reg.parameters(), lr=0.001, weight_decay=0.0001)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+
 
     for epoch in range(training_epochs):
         reg.train()
@@ -61,7 +59,15 @@ def train(
             # Backward pass and optimization
             optimizer.zero_grad()
             loss.backward()
+            nn.utils.clip_grad_norm_(reg.parameters(), 0.1)
             optimizer.step()
+
+
+        scheduler.step()
+        current_lr = scheduler.get_last_lr()[0]
+        print(f"Current Learning Rate: {current_lr:.6f}")
+
+
 
         # Print training loss after each epoch
         print(f"Epoch [{epoch + 1}/{training_epochs}], Training Loss: {loss.item():.4f}")

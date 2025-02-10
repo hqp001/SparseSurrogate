@@ -1,3 +1,4 @@
+import sys
 import os
 import torch
 import gurobipy as gp
@@ -6,6 +7,17 @@ from formulation import formulate
 import manager
 
 TIME_LIMIT = 300
+MAP_BATCH = {
+    -1: -1,
+    0: [0, 10],
+    1: [20, 30],
+    2: [40, 50],
+    3: [60, 70],
+    4: [80, 90]
+}
+BATCH_NUM = -1
+BASE_FOLDER = "experiments"
+
 
 def gurobi_callback(model, where):
     #global first_negative_time, most_negative_solution, start_time
@@ -123,7 +135,6 @@ def get_gurobi_result(time_limit, gurobi_model, dense_model, right_label, wrong_
         raise ValueError(f"Unexpected status : {m.status}")
 
     return objective_value, m._most_negative_solution, m._first_negative_time, m.Runtime, m.status
-    #return objective_value, runtime, most_negative_solution, first_negative_time
 
 def add_line_to_csv(file_name, data):
     file_exists = os.path.isfile(file_name)
@@ -144,8 +155,12 @@ def run_formulation():
 
         args_list = ['data_seed', 'training_seed', 'n_pixel_1d',
                 'n_layers', 'layer_size']
+
+        if input_args['data_seed'] not in MAP_BATCH[BATCH_NUM]:
+            continue
+
         formulate_args = manager.filter_arguments(input_args, args_list)
-        formulate_args["model_path"] = f"./models/{input_id}/dense/dense.pth"
+        formulate_args["model_path"] = f"./{BASE_FOLDER}/{input_id}/dense/dense.pth"
 
         for model_name in manager.get_all_model_names(input_id=input_id):
 
@@ -157,11 +172,11 @@ def run_formulation():
             formulate_results = formulate(**formulate_args)
 
             scip = formulate_results[-1]
-            scip.writeProblem("./tmp.mps")
+            scip.writeProblem(f"./{BATCH_NUM}.mps")
             dense_model, sparse_model = formulate_results[0], formulate_results[1]
             right_label, wrong_label = formulate_results[2], formulate_results[3]
 
-            objective_value, most_negative_solution, first_negative_time, runtime, solver_status = get_gurobi_result(TIME_LIMIT, gp.read("./tmp.mps"), dense_model, right_label, wrong_label)
+            objective_value, most_negative_solution, first_negative_time, runtime, solver_status = get_gurobi_result(TIME_LIMIT, gp.read(f"./{BATCH_NUM}.mps"), dense_model, right_label, wrong_label)
 
             gurobi_args = {}
             gurobi_args["ObjectiveValue"] = objective_value
@@ -176,8 +191,13 @@ def run_formulation():
 
             print(model_info)
 
-
 def main():
+    if len(sys.argv) != 2:
+        print("Usage: python RunSolver.py BATCH_NUM")
+        sys.exit(1)
+
+    global BATCH_NUM
+    BATCH_NUM = int(sys.argv[1])
     run_formulation()
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ from pyscipopt import Model, quicksum
 
 from pyscipopt_ml.add_predictor import add_predictor_constr
 
-from Trainer.Dataset import MNISTDataset
+from Trainer.Dataset import FashionMNISTDataset
 
 def create_neural_network(model_path, n_layers, n_pixel_1d, layer_size):
 
@@ -42,8 +42,8 @@ def formulate(
     image_number = data_random_state.randint(low=0, high=30000)
     torch.manual_seed(training_seed)
 
-    train_dataset = MNISTDataset(train=True, n_size_1d=n_pixel_1d).get_raw_data()
-    test_dataset = MNISTDataset(train=True, n_size_1d=n_pixel_1d).get_raw_data()
+    train_dataset = FashionMNISTDataset(train=True, n_size_1d=n_pixel_1d).get_raw_data()
+    test_dataset = FashionMNISTDataset(train=True, n_size_1d=n_pixel_1d).get_raw_data()
 
     # values most change the classification of an image
     scip = Model()

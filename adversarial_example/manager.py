@@ -4,6 +4,8 @@ import hashlib
 from datetime import datetime
 import torch  # PyTorch library for model handling
 
+BASE_FOLDER = 'fashion_experiments'
+
 def generate_id_from_args(input_args):
     """Generate a unique ID based on the input arguments using SHA256 hashing."""
     args_str = json.dumps(input_args, sort_keys=True)  # Convert dictionary to a sorted JSON string
@@ -11,7 +13,7 @@ def generate_id_from_args(input_args):
     unique_id = full_hash[:16]  # Truncate to 8 characters
     return unique_id
 
-def insert_input_arguments(base_path='models', input_args=None):
+def insert_input_arguments(base_path=BASE_FOLDER, input_args=None):
     """Insert input arguments, generate an ID, and create a corresponding folder."""
     if input_args is None:
         raise ValueError("Input arguments must be provided.")
@@ -34,7 +36,7 @@ def insert_input_arguments(base_path='models', input_args=None):
 
     return input_id
 
-def insert_model(base_path='models', input_id=None, model_name=None, output_args=None, model=None):
+def insert_model(base_path=BASE_FOLDER, input_id=None, model_name=None, output_args=None, model=None):
     """Insert model information and save it under the corresponding input ID folder."""
     if input_id is None or model_name is None or output_args is None or model is None:
         raise ValueError("All parameters (input_id, model_name, output_args, model) must be provided.")
@@ -80,7 +82,7 @@ def update_summary_metadata(base_path, input_id, input_args):
         json.dump(summary_data, json_file, indent=4)
     print(f"Summary metadata updated at {summary_file_path}")
 
-def get_all_input_arguments(base_path='models'):
+def get_all_input_arguments(base_path=BASE_FOLDER):
     """
     Loop through input IDs in summary.json file and return a dictionary of input arguments.
 
@@ -111,7 +113,7 @@ def get_all_input_arguments(base_path='models'):
 
     return inputs_dict
 
-def get_all_model_names(base_path='models', input_id=None):
+def get_all_model_names(base_path=BASE_FOLDER, input_id=None):
     """
     Get all model names in a given input ID.
 
@@ -137,7 +139,7 @@ def get_all_model_names(base_path='models', input_id=None):
 
     return model_names
 
-def update_model_info(base_path='models', input_id=None, model_name=None, new_data=None):
+def update_model_info(base_path=BASE_FOLDER, input_id=None, model_name=None, new_data=None):
     """
     Update info in the JSON file based on the pair (input_id, model_name).
 
@@ -171,7 +173,7 @@ def update_model_info(base_path='models', input_id=None, model_name=None, new_da
 
     print(f"Updated JSON file for model '{model_name}' at: {output_file_path}")
 
-def get_model_info(base_path='models', input_id=None, model_name=None):
+def get_model_info(base_path=BASE_FOLDER, input_id=None, model_name=None):
     """
     Retrieve the .pth file path and arguments from the JSON file based on the pair (input_id, model_name).
 

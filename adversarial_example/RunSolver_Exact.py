@@ -1,3 +1,4 @@
+import sys
 import os
 import time
 import torch
@@ -8,6 +9,15 @@ from formulation_double import formulate_double
 import manager
 
 TIME_LIMIT = 300
+MAP_BATCH = {
+    -1: -1,
+    0: 0,
+    1: 1,
+    2: 8,
+    3: 90
+}
+BATCH_NUM = -1
+
 
 def gurobi_callback(model, where):
     #global first_negative_time, most_negative_solution, start_time
@@ -135,6 +145,7 @@ def get_gurobi_result(time_limit, gurobi_sparse_model, gurobi_double_model, dens
 
     m._aux_model = gurobi_double_model
     m._aux_model.setParam("TimeLimit", 50)
+    m._aux_model.setParam("Threads", 8)
     m._aux_model._x_vars = [v for v in m._aux_model.getVars() if v.VarName.startswith('x_')]
     m._dense_model = dense_model
     m._right_label = right_label
@@ -181,7 +192,15 @@ def run_formulation():
         formulate_args = manager.filter_arguments(input_args, args_list)
         formulate_args["model_path"] = f"./models/{input_id}/dense/dense.pth"
 
+        if input_args['data_seed'] != MAP_BATCH[BATCH_NUM]:
+            continue
+
+
         for model_name in manager.get_all_model_names(input_id=input_id):
+
+            if model_name != "non_finetune_0.5" and model_name != "non_finetune_0.8" and model_name != "non_finetune_0.9":
+                continue
+
 
             print(f"\nSolving {input_id} - {model_name}")
 
@@ -192,14 +211,14 @@ def run_formulation():
             formulate_doube_results = formulate_double(**formulate_args)
 
             scip_sparse = formulate_sparse_results[-1]
-            scip_sparse.writeProblem("./tmp_sparse.mps")
+            scip_sparse.writeProblem(f"./{BATCH_NUM}_sparse.mps")
             dense_model, sparse_model = formulate_sparse_results[0], formulate_sparse_results[1]
             right_label, wrong_label = formulate_sparse_results[2], formulate_sparse_results[3]
 
             scip_double = formulate_doube_results[-1]
-            scip_double.writeProblem("./tmp_double.mps")
+            scip_double.writeProblem(f"./{BATCH_NUM}_double.mps")
 
-            objective_value, most_negative_solution, first_negative_time, runtime, solver_status = get_gurobi_result(TIME_LIMIT, gp.read("./tmp_sparse.mps"), gp.read("./tmp_double.mps"), dense_model, right_label, wrong_label)
+            objective_value, most_negative_solution, first_negative_time, runtime, solver_status = get_gurobi_result(TIME_LIMIT, gp.read(f"./{BATCH_NUM}_sparse.mps"), gp.read(f"./{BATCH_NUM}_double.mps"), dense_model, right_label, wrong_label)
 
             gurobi_args = {}
             gurobi_args["ObjectiveValue"] = objective_value
@@ -208,7 +227,7 @@ def run_formulation():
             gurobi_args["SolverStatus"] = solver_status
             gurobi_args["Runtime"] = runtime
 
-            model_info["Exact"] = gurobi_args
+            model_info["Exact_50"] = gurobi_args
 
             manager.update_model_info(input_id=input_id, model_name=model_name, new_data=model_info)
 
@@ -216,7 +235,14 @@ def run_formulation():
 
 
 def main():
+    if len(sys.argv) != 2:
+        print("Usage: python RunSolver.py BATCH_NUM")
+        sys.exit(1)
+
+    global BATCH_NUM
+    BATCH_NUM = int(sys.argv[1])
     run_formulation()
+
 
 if __name__ == "__main__":
     main()
