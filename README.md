@@ -1,6 +1,7 @@
-# MLResearch2024_2ndPhase
+# Optimization over Trained (and Sparse) Neural Networks: A Surrogate within a Surrogate
 
-## Go take a look at the issue section first
+Corresponding Author: Dr. Thiago Serra
+Co-Authors: Hung Pham; Aiden Ren; Ibrahim Tahir; Jiatai Tong
 
 ## Setting Up the Environment
 
