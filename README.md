@@ -39,3 +39,33 @@ git commit -m "Delete this file" # You can git add or commit anytimes you want
 # After making sure everything is good, create a pull request to this repo using
 gh pr create --title "Abc" --body "DEF"
 ```
+
+## How to Run the Scripts
+
+### Running the Trainer
+
+You have to run the training first to train the sparse model
+
+```bash
+# Using Python script
+python adversarial_example/RunTraining.py
+
+# or
+
+sbatch bisonnet-template_gpu.sh # on Bisonnet
+```
+
+
+To run the solver, you can either execute the `adversarial_example/RunSolver.py` script or use the `bisonnet-template_cpu.sh` script in the main directory. 
+
+```bash
+# Using Python script
+python adversarial_example/RunSolver.py
+
+# Using shell script
+sh ./bisonnet-template_cpu.sh
+
+# or
+
+sbatch bisonnet-template_cpu.sh # on Bisonnet
+```
