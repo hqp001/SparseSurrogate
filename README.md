@@ -1,6 +1,7 @@
 # Optimization over Trained (and Sparse) Neural Networks: A Surrogate within a Surrogate
 
 Corresponding Author: Dr. Thiago Serra
+
 Co-Authors: Hung Pham; Aiden Ren; Ibrahim Tahir; Jiatai Tong
 
 ## Setting Up the Environment
